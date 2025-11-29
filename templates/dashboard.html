@@ -1,0 +1,230 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard | Biz AI Assistant{% endblock %}
+
+{% block content %}
+<header>
+  <h1>📊 Biz AI Analytics & Assistant</h1>
+  <p class="subtitle">Upload your sales & expense data to get instant insights.</p>
+</header>
+
+<div class="card-grid">
+  <div class="card">
+    <h2>Total Income</h2>
+    <div class="card-value">₹{{ "%.2f"|format(stats.total_income) }}</div>
+    <div class="card-tag">All-time recorded income</div>
+  </div>
+  <div class="card">
+    <h2>Total Expense</h2>
+    <div class="card-value">₹{{ "%.2f"|format(stats.total_expense) }}</div>
+    <div class="card-tag">All-time recorded expenses</div>
+  </div>
+  <div class="card">
+    <h2>Net Profit</h2>
+    <div class="card-value">₹{{ "%.2f"|format(stats.net_profit) }}</div>
+    <div class="card-tag">Income - Expense</div>
+  </div>
+</div>
+
+<div class="main-layout">
+  <div class="panel">
+    <h3>📂 Upload Transactions (CSV / Excel)</h3>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="flash flash-{{ category }}">{{ message }}</div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    <form method="POST" enctype="multipart/form-data">
+      <label for="file">File format (columns):</label>
+      <p style="font-size: 12px; color: #9ca3af; margin-bottom: 6px;">
+        Required: <code>date, type, amount</code> &nbsp; | Optional:
+        <code>category, description, customer, product</code><br>
+        Example: <code>2025-11-01, income, 5000, Freelancing, Website payment, Client A, Website Design</code>
+      </p>
+      <input type="file" name="file" id="file" accept=".csv,.xlsx,.xls" required />
+      <button type="submit">🚀 Upload & Save</button>
+    </form>
+  </div>
+
+  <div class="panel">
+    <h3>📜 Latest Transactions</h3>
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Type</th>
+            <th>Category</th>
+            <th>Description</th>
+            <th>Amount (₹)</th>
+            <th>Customer</th>
+            <th>Product</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for t in stats.latest_txns %}
+            <tr>
+              <td>{{ t.date.strftime("%Y-%m-%d") }}</td>
+              <td>{{ t.type }}</td>
+              <td>{{ t.category or "-" }}</td>
+              <td>{{ t.description or "-" }}</td>
+              <td>{{ "%.2f"|format(t.amount) }}</td>
+              <td>{{ t.customer or "-" }}</td>
+              <td>{{ t.product or "-" }}</td>
+            </tr>
+          {% else %}
+            <tr>
+              <td colspan="7">No transactions yet. Upload a file to get started.</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Analytics panel -->
+<div class="panel" style="margin-top: 20px;">
+  <h3>📈 Analytics Overview</h3>
+  <p style="font-size: 12px; color: #9ca3af; margin-bottom: 10px;">
+    Category-wise and month-wise trends based on all uploaded transactions.
+  </p>
+
+  <div style="display: grid; grid-template-columns: 1.2fr 1.8fr; gap: 20px; margin-top: 10px;">
+    <div>
+      <h4 style="font-size: 14px; margin-bottom: 6px;">Category-wise Distribution</h4>
+      <canvas id="categoryChart"></canvas>
+    </div>
+    <div>
+      <h4 style="font-size: 14px; margin-bottom: 6px;">Monthly Trend</h4>
+      <canvas id="monthChart"></canvas>
+    </div>
+  </div>
+</div>
+
+<div class="panel" style="margin-top: 20px;">
+  <h3>🤖 AI Business Assistant</h3>
+  <p style="font-size: 12px; color: #9ca3af; margin-bottom: 10px;">
+    Ask questions like:
+    <br>• "What is my total profit?"
+    <br>• "Which category is my biggest expense?"
+    <br>• "How was my business performance in the last few months?"
+  </p>
+
+  <form method="POST">
+    <input type="hidden" name="form_type" value="chat" />
+    <textarea
+      name="question"
+      rows="3"
+      style="width: 100%; padding: 8px; border-radius: 8px; border: 1px solid #1f2937; background: #020617; color: #e5e7eb; font-size: 13px; margin-bottom: 8px;"
+      placeholder="Type your question about your business data here..."
+    >{% if chat_question %}{{ chat_question }}{% endif %}</textarea>
+    <button type="submit">💬 Ask AI</button>
+  </form>
+
+  {% if chat_answer %}
+    <div style="margin-top: 12px; padding: 10px; background: #020617; border-radius: 10px; border: 1px solid #1f2937; font-size: 13px; white-space: pre-wrap;">
+      {{ chat_answer }}
+    </div>
+  {% endif %}
+</div>
+
+{% endblock %}
+
+
+{% block scripts %}
+<script>
+  const categoryLabels = {{ stats.category_labels|tojson }};
+  const categoryValues = {{ stats.category_values|tojson }};
+  const monthLabels = {{ stats.month_labels|tojson }};
+  const monthValues = {{ stats.month_values|tojson }};
+
+  // Category Pie Chart
+  const catCtx = document.getElementById('categoryChart');
+  if (catCtx && categoryLabels.length > 0) {
+    new Chart(catCtx, {
+      type: 'pie',
+      data: {
+        labels: categoryLabels,
+        datasets: [{
+          data: categoryValues,
+        }]
+      },
+      options: {
+        plugins: {
+          legend: {
+            labels: {
+              color: '#e5e7eb',
+              font: { size: 11 }
+            }
+          }
+        }
+      }
+    });
+  }
+
+  // Monthly Bar Chart
+  const monthCtx = document.getElementById('monthChart');
+  if (monthCtx && monthLabels.length > 0) {
+    new Chart(monthCtx, {
+      type: 'bar',
+      data: {
+        labels: monthLabels,
+        datasets: [{
+          data: monthValues,
+        }]
+      },
+      options: {
+        scales: {
+          x: {
+            ticks: { color: '#e5e7eb', font: { size: 10 } },
+            grid: { display: false }
+          },
+          y: {
+            ticks: { color: '#e5e7eb', font: { size: 10 } },
+            grid: { color: '#1f2937' }
+          }
+        },
+        plugins: { legend: { display: false } }
+      }
+    });
+  }
+</script>
+<div class="panel" style="margin-top: 20px;">
+  <h3>🔮 Revenue Forecast (Next 30 Days)</h3>
+
+  {% if forecast_total %}
+    <p style="font-size: 15px; margin: 8px 0;">
+      Estimated Revenue for Next 30 Days:
+      <strong>₹{{ "%.2f"|format(forecast_total) }}</strong>
+    </p>
+
+    <div style="max-height: 220px; overflow-y: auto; font-size: 12px;">
+      <table>
+        <thead>
+          <tr>
+            <th>Day</th>
+            <th>Estimated Revenue (₹)</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in forecast_data %}
+            <tr>
+              <td>{{ row.day }}</td>
+              <td>{{ "%.2f"|format(row.predicted) }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+  {% else %}
+    <p style="color: #9ca3af;">Not enough income data to generate forecast. Upload more income entries.</p>
+  {% endif %}
+</div>
+
+{% endblock %}

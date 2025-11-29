@@ -1,0 +1,9 @@
+flask
+gunicorn
+sqlalchemy
+pandas
+python-dateutil
+openai
+python-dotenv
+scikit-learn
+numpy
